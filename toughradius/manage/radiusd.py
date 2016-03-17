@@ -50,7 +50,7 @@ class RADIUSMaster(protocol.DatagramProtocol):
         self.transport.write(data, (host, int(port)))
 
 
-class RADIUSAuthWorker(object):
+class RADIUSAuthWorker(protocol.DatagramProtocol):
 
     def __init__(self, config, dbengine, radcache=None):
         self.config = config
@@ -66,6 +66,10 @@ class RADIUSAuthWorker(object):
         logger.info("init auth worker pusher : %s " % (self.pusher))
         logger.info("init auth worker puller : %s " % (self.puller))
         logger.info("init auth stat pusher : %s " % (self.stat_pusher))
+        reactor.listenUDP(0, self)
+
+    def datagramReceived(self, datagram, (host, port)):
+        pass
 
     def find_nas(self,ip_addr):
         def fetch_result():
@@ -98,7 +102,8 @@ class RADIUSAuthWorker(object):
         logger.info("[Radiusd] :: Send radius response: %s" % repr(reply))
         if self.config.system.debug:
             logger.debug(reply.format_str())
-        self.pusher.push(msgpack.packb([reply.ReplyPacket(),host,port]))
+        # self.pusher.push(msgpack.packb([reply.ReplyPacket(),host,port]))
+        self.transport.write(reply.ReplyPacket(), (host,port))
 
     def createAuthPacket(self, **kwargs):
         vendor_id = kwargs.pop('vendor_id',0)
