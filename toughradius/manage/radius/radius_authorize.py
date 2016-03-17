@@ -16,9 +16,9 @@ class RadiusAuth(RadiusBasic):
         self.reply = {'code':0, 'msg':'success', 'attrs':{}}
         self.filters = [
             self.status_filter,
-            self.bind_filter,
+            # self.bind_filter,
             self.policy_filter,
-            self.limit_filter,
+            # self.limit_filter,
             self.session_filter
         ]
 
@@ -93,10 +93,9 @@ class RadiusAuth(RadiusBasic):
     @timecast
     def policy_filter(self):
         acct_policy = self.product.product_policy or PPMonth
-        bill_type = self.get_account_attr('bill_type')
         input_max_limit = self.product.input_max_limit
         output_max_limit = self.product.output_max_limit
-        if acct_policy in ( PPMonth,BOMonth) or (acct_policy == FreeFee and bill_type == FreeFeeDate):
+        if acct_policy in ( PPMonth,BOMonth):
              # 预付费包月/买断包月/自由时段
             if utils.is_expire(self.account.expire_date):
                 self.reply['attrs']['Framed-Pool'] = self.get_param_value("expire_addrpool")
@@ -106,19 +105,15 @@ class RadiusAuth(RadiusBasic):
             if self.get_user_balance() <= 0:
                 return self.failure('Lack of balance')    
                 
-        elif acct_policy == BOTimes  or (acct_policy == FreeFee and bill_type == FreeTimeLen):
+        elif acct_policy == BOTimes:
             # 买断时长 / 自由买断时长
             if self.get_user_time_length() <= 0:
                 return self.failure('Lack of time_length')
                 
-        elif acct_policy == BOFlows  or (acct_policy == FreeFee and bill_type == FreeFeeFlow): 
+        elif acct_policy == BOFlows: 
             # 买断流量 / 自由买断流量
             if self.get_user_flow_length() <= 0:
                 return self.failure('Lack of  flow_length')
-
-        if acct_policy == FreeFee:
-            input_max_limit = self.get_account_attr('input_max_limit')
-            output_max_limit = self.get_account_attr('output_max_limit')
 
         self.reply['input_limit'] = input_max_limit
         self.reply['output_limit'] = output_max_limit
@@ -143,14 +138,10 @@ class RadiusAuth(RadiusBasic):
                 else:
                     return self.failure('User has expired')
 
-        acct_interim_intelval = int(self.get_param_value("acct_interim_intelval",0))
-        if acct_interim_intelval > 0:
-            self.reply['attrs']['Acct-Interim-Interval'] = acct_interim_intelval
 
         acct_policy = self.product.product_policy or PPMonth
-        bill_type = self.get_account_attr('bill_type')
 
-        if acct_policy in (PPMonth,BOMonth) or (acct_policy == FreeFee and bill_type == FreeFeeDate):
+        if acct_policy in (PPMonth,BOMonth):
             # 预付费包月/买断包月/自由时段
             expire_date = self.account.expire_date
             _datetime = datetime.datetime.now()
@@ -158,7 +149,7 @@ class RadiusAuth(RadiusBasic):
                 _expire_datetime = datetime.datetime.strptime(expire_date+' 23:59:59',"%Y-%m-%d %H:%M:%S")
                 session_timeout = (_expire_datetime - _datetime).seconds 
 
-        elif acct_policy  == BOTimes  or (acct_policy == FreeFee and bill_type == FreeTimeLen):
+        elif acct_policy  == BOTimes:
             # 买断时长 / 自由买断时长
             _session_timeout = self.account.time_length
             if _session_timeout < session_timeout:
@@ -179,8 +170,6 @@ class RadiusAuth(RadiusBasic):
         if self.account.ip_address:
             self.reply['attrs']['Framed-IP-Address'] = self.account.ip_address
 
-        for attr in self.get_product_attrs(self.account.product_id):
-            self.reply['attrs'][attr.attr_name] = attr.attr_value
 
         return True
 
